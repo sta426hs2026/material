@@ -24,8 +24,8 @@ tba
 | 21.09.2026  | Hubert | NGS intro; exploratory data analysis | EDA in R | | |
 | 28.09.2026  | Hubert | mapping  | Rsubread | | |
 | 05.10.2026  | Mark  | limma + friends | linear model simulation + design matrices | | |
-| 12.10.2026  | Hubert | RNA-seq quantification | RSEM  | X | X | 
-| 19.10.2026  | Mark | hands-on session #1: benchmarking | group exercise: Omnibenchmark | | |
+| 12.10.2026  | Hubert | RNA-seq quantification | RSEM  | | | 
+| 19.10.2026  | Mark | hands-on session #1: benchmarking | group exercise: Omnibenchmark | X | X |
 | 26.10.2026  | Mark | edgeR+friends 1 | basic edgeR/voom | X | X |
 | 02.11.2026  | Mark | edgeR+friends 2 | advanced edgeR/voom | X | X |
 | 09.11.2026  | Mark | hands-on session #2: RNA-seq |  FASTQC/Salmon/etc. | X | X |
