@@ -30,7 +30,7 @@ Monday 11.00-11.45
 | 02.11.2026  | Mark | edgeR+friends 2 | advanced edgeR/voom | [Probabilistic cell-type assignment of single-cell RNA-seq for tumor microenvironment profiling](https://www.nature.com/articles/s41592-019-0529-1#Sec2) (AM, SP) | X |
 | 09.11.2026  | Mark | hands-on session #2: RNA-seq |  FASTQC/Salmon/etc. | [Sensitive cluster-free differential expression testing](https://www.biorxiv.org/content/10.1101/2023.03.08.531744v1) (LPD, ES, JS) | [Normalization and variance stabilization of single-cell RNA-seq data using regularized negative binomial regression](https://doi.org/10.1186/s13059-019-1874-1) (BR, LT, ZD) |
 | 16.11.2026  | Hubert | single-cell 1: preprocessing, dim. red., clustering | clustering | X | X |
-| 23.11.2026  | Mark | single-cell 2: clustering, marker gene DE | marker gene DE | X | X |
+| 23.11.2026  | Mark | single-cell 2: clustering, marker gene DE | marker gene DE | [Model-based dimensionality reduction for single-cell RNA-seq using generalized bilinear models](https://academic.oup.com/biostatistics/article/26/1/kxaf024/8229239) (LM, AR, BU) | X |
 | 30.11.2026  | Pierre-Luc | hands-on session #3: single-cell RNA-seq | full scRNA-seq pipeline | [Efficient differential expression analysis of large-scale single-cell transcriptomics data using Dreamlet](https://www.nature.com/articles/s41467-026-75680-8) (GK, WR) | X |
 | 07.12.2026  | Mark | spatial omics 1 | spatial statistics | X | X  |
 | 14.12.2026  | Mark | spatial omics 2 | structures, DSP | X | X |
