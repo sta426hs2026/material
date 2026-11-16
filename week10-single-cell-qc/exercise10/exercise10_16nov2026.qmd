@@ -1,0 +1,320 @@
+---
+title: "STA426 Exercise 10: Quality control, clustering and the limits of both"
+author: "Hubert Rehrauer"
+date: today
+format:
+    html:
+      toc: true
+      self-contained: true
+      highlight-style: github
+      code-line-numbers: true
+editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+startTime = proc.time()
+```
+
+## Background
+
+The data set consists of about 10'000 peripheral blood mononuclear cells (PBMCs) from one 10x Genomics run.
+Each cell carries a `cellType` label that was derived with additional data and serves as ground truth here.
+There are 29 cell types. A cell is `unassigned` if no cell type could be assigned reliably.
+
+You will do two things that every single-cell analysis starts with: remove low-quality cells and cluster the rest.
+Because the ground truth is known, you can check what these two steps really do.
+
+**Learning goals.** After this exercise you can
+
+1. compute per-cell quality metrics and judge what a quality filter removes;
+2. compare a clustering with known cell types, with a contingency table and with a single number;
+3. explain, with examples from this data set, why clusters and cell types do not match one to one;
+4. tell a harmless mismatch (one cell type in several clusters) from a harmful one (several cell types in one cluster).
+
+**How to work.** Several tasks start with *Predict*. Write your prediction down *before* you run the code.
+A wrong prediction is not a mistake; the comparison with the result is the point of the task.
+
+
+**What to hand in.** Start from this Quarto file and add your answers and code. Hand in the quarto and the rendered html.
+
+The workflow is inspired by <http://bioconductor.org/books/release/OSCA/>.
+
+```{r load packages}
+suppressPackageStartupMessages({
+  library(scuttle)
+  library(scran)
+  library(scater)
+  library(bluster)
+  library(ggplot2)
+  library(pheatmap)
+})
+rotateX = theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+## Part 0: Load the data
+
+```{r load data}
+sce = readRDS("pbmc-sce.RDS")
+sce
+```
+
+The full data set gives the clearest picture. If your computer is slow, reduce `nCells`; rare cell types then get very small.
+
+```{r subsample cells}
+nCells = 5000
+set.seed(38)
+if (ncol(sce) > nCells) {
+  sce = sce[ , sample(ncol(sce), size = nCells, replace = FALSE)]
+}
+```
+
+The annotation is fine-grained. The table below groups the labels into major cell types; you will need both levels.
+
+```{r major cell types}
+majorMap = c(
+  "CD14 Mono" = "Monocyte", "CD16 Mono" = "Monocyte",
+  "CD4 Naive" = "CD4 T", "CD4 TCM" = "CD4 T", "CD4 TEM" = "CD4 T", "Treg" = "CD4 T",
+  "CD4 CTL" = "CD4 T", "CD4 Proliferating" = "CD4 T",
+  "CD8 Naive" = "CD8 T", "CD8 TCM" = "CD8 T", "CD8 TEM" = "CD8 T",
+  "gdT" = "other T", "MAIT" = "other T", "dnT" = "other T",
+  "NK" = "NK", "NK_CD56bright" = "NK", "NK Proliferating" = "NK",
+  "B naive" = "B", "B intermediate" = "B", "B memory" = "B", "Plasmablast" = "B",
+  "cDC1" = "DC", "cDC2" = "DC", "pDC" = "DC", "ASDC" = "DC",
+  "Eryth" = "Erythrocyte", "Platelet" = "Platelet", "HSPC" = "HSPC", "ILC" = "ILC",
+  "unassigned" = "unassigned")
+stopifnot(all(sce$cellType %in% names(majorMap)))
+sce$majorType = unname(majorMap[sce$cellType])
+```
+
+```{r barplot cell types, fig.width=10, fig.height=5}
+cd = as.data.frame(colData(sce))
+ggplot(cd, aes(x = reorder(cellType, cellType, function(x) -length(x)), fill = majorType)) +
+  geom_bar() + scale_y_log10() + xlab("cell type") + rotateX
+```
+
+## Part 1: Quality control
+
+### 1.1 Quality metrics
+
+```{r quality scores}
+isMito = grepl("^MT-", rowData(sce)$Symbol)
+sce = addPerCellQC(sce, subsets = list(Mito = isMito))
+colnames(colData(sce))
+```
+
+**Task** Plot the three metrics `sum` (UMIs per cell), `detected` (genes per cell) and `subsets_Mito_percent` against `cellType`
+with `plotColData()`. Use a log scale where it helps.
+
+```{r plot quality scores, fig.width=10, fig.height=4}
+## your code
+
+```
+
+**Task** Which cell types stand out, and in which metric? What would be a biological reason?
+
+### 1.2 A standard filter
+
+`perCellQCFilters()` flags cells that lie more than 3 median absolute deviations (MADs) from the median: too few UMIs, too few genes,
+or too high a mitochondrial percentage.
+
+**Task** *Guess before running the chunk:* which share of the `unassigned` cells will this filter remove?
+Will it remove cells of any assigned cell type?
+
+```{r standard filter}
+qc = perCellQCFilters(sce, sub.fields = "subsets_Mito_percent")
+colSums(as.matrix(qc))
+sce$discard = qc$discard
+```
+
+```{r filter by cell type}
+qcByType = data.frame(
+  nCells = as.vector(table(sce$cellType)),
+  discarded = as.vector(tapply(sce$discard, sce$cellType, sum)),
+  row.names = names(table(sce$cellType)))
+qcByType$fraction = round(qcByType$discarded / qcByType$nCells, 2)
+qcByType[order(-qcByType$fraction), ]
+```
+
+The original idea of this exercise was to treat `unassigned` as "low quality". The two numbers below measure the filter in that sense.
+
+```{r sensitivity}
+isUnassigned = sce$cellType == "unassigned"
+c(sensitivity = mean(sce$discard[isUnassigned]),      # unassigned cells that are removed
+  specificity = mean(!sce$discard[!isUnassigned]))    # assigned cells that are kept
+```
+
+**Task** Compare with your prediction.
+
+a) Is "unassigned" the same as "low quality"? Use the metric plots of the unassigned cells that the filter keeps.
+b) Which assigned cell types does the filter remove almost completely? Are these low-quality cells?
+
+**Task** Try to do better: change `nmads`, use `isOutlier()` on single metrics, or set fixed thresholds.
+Report sensitivity, specificity and the table by cell type for at least two alternatives.
+
+```{r alternative filters}
+## your code
+
+```
+
+**Task** Choose the filter you would use if you had *no* ground truth, and justify it. Which cell types do you accept to lose?
+Set `sce$discard` accordingly; the rest of the exercise uses it.
+
+```{r apply filter}
+sceFilt = sce[ , !sce$discard]
+table(sceFilt$majorType)
+```
+
+## Part 2: Clustering against the ground truth
+
+### 2.1 Normalization, feature selection, PCA
+
+```{r preprocess}
+preprocess = function(sce, nHvg = 2000, nPcs = 30) {
+  sce = sce[Matrix::rowSums(counts(sce) > 0) >= 5, ]
+  sce = logNormCounts(sce)
+  dec = modelGeneVarByPoisson(sce)
+  hvg = getTopHVGs(dec, n = nHvg)
+  set.seed(38)
+  sce = runPCA(sce, subset_row = hvg, ncomponents = nPcs)
+  sce = runUMAP(sce, dimred = "PCA")
+  sce
+}
+sceFilt = preprocess(sceFilt)
+```
+
+```{r umap truth, fig.width=10, fig.height=5}
+plotReducedDim(sceFilt, "UMAP", colour_by = "majorType")
+plotReducedDim(sceFilt, "UMAP", colour_by = "cellType", text_by = "cellType", text_size = 3) +
+  theme(legend.position = "none")
+```
+
+**Task** Look at the two plots. Which cell types form separate islands, and which ones overlap within an island?
+
+
+### 2.2 Two kinds of mismatch, and tools to measure them
+
+A clustering can disagree with the cell types in two ways, and they are not equally bad.
+
+- **Split:** one cell type is spread over several clusters. This is a minor nuisance. If every one of these clusters contains only
+  that cell type, you give them the same label and merge them. Nothing is lost.
+- **Mixed:** one cluster contains several cell types. This is the real problem. No label can repair it: whatever name the cluster
+  gets, the cells of the other types are wrong, and every downstream comparison treats them as one population.
+
+The helper functions below measure both. Read them and make sure you understand what they compute.
+
+```{r helper functions}
+## label every cluster with its most frequent cell type ("majority label")
+majorityLabel = function(cluster, cellType) {
+  tab = unclass(table(cluster, cellType))
+  lab = colnames(tab)[apply(tab, 1, which.max)]
+  names(lab) = rownames(tab)
+  unname(lab[as.character(cluster)])
+}
+
+## summary of one clustering
+##   ari        adjusted Rand index of the raw clusters: punishes split AND mixed
+##   purity     share of cells whose cluster's majority label is their own cell type: punishes only mixed
+##   ariMerged  ARI after merging clusters with the same majority label: what is left after repairing the splits
+evalClustering = function(cluster, cellType) {
+  use = cellType != "unassigned"
+  cluster = as.character(cluster[use]); cellType = cellType[use]
+  merged = majorityLabel(cluster, cellType)
+  c(nClusters = length(unique(cluster)),
+    ari = mclust::adjustedRandIndex(cluster, cellType),
+    purity = mean(merged == cellType),
+    ariMerged = mclust::adjustedRandIndex(merged, cellType))
+}
+
+## per cell type
+##   nClust         number of clusters that hold at least 10 % of the cell type (split)
+##   inOwnClusters  share of the cell type that sits in clusters where it is the majority (not mixed away)
+matchTable = function(cluster, cellType) {
+  tab = unclass(table(cellType, cluster))
+  merged = majorityLabel(cluster, cellType)
+  data.frame(cellType = rownames(tab), nCells = rowSums(tab),
+             nClust = rowSums(tab / rowSums(tab) >= 0.1),
+             inOwnClusters = round(as.vector(tapply(merged == cellType, cellType, mean)[rownames(tab)]), 2),
+             row.names = NULL)
+}
+```
+
+A cell type is *recovered* if most of its cells (say, at least 70 %) sit in clusters where it is the majority. It may be split over
+several such clusters.
+
+**Task** `purity` can only be computed with a ground truth. Which value does it take if every cell is its own cluster?
+What does that tell you about using purity alone to choose a clustering?
+
+### 2.3 A first clustering
+
+```{r kmeans}
+set.seed(100)
+sceFilt$kmeans10 = factor(kmeans(reducedDim(sceFilt, "PCA"), centers = 10)$cluster)
+round(evalClustering(sceFilt$kmeans10, sceFilt$cellType), 2)
+```
+
+```{r kmeans heatmap, fig.width=8, fig.height=7}
+tab = unclass(table(sceFilt$cellType, sceFilt$kmeans10))
+pheatmap(tab / rowSums(tab), cluster_cols = FALSE,
+         main = "share of each cell type (row) per cluster (column)")
+mt = matchTable(sceFilt$kmeans10, sceFilt$cellType)
+mt[order(-mt$nCells), ]
+```
+
+
+### 2.4 Resolution: splitting is cheap, mixing is not
+
+Graph-based clustering is the standard for single-cell data. The resolution parameter controls the number of clusters.
+
+```{r graph clustering}
+clusterGraph = function(sce, k = 15, resolution = 1) {
+  clusterCells(sce, use.dimred = "PCA",
+               BLUSPARAM = NNGraphParam(k = k, cluster.fun = "louvain",
+                                        cluster.args = list(resolution = resolution)))
+}
+set.seed(100)
+sceFilt$graph1 = clusterGraph(sceFilt, resolution = 1)
+round(evalClustering(sceFilt$graph1, sceFilt$cellType), 2)
+```
+
+**Task 2.4** *Predict before you run anything.** You raise the resolution step by step, far beyond the 29 annotated cell types.
+Sketch how you expect `ari`, `purity` and the number of recovered cell types to change with the number of clusters.
+
+**Task 2.5.** Run a sweep over at least seven resolutions (for example 0.1, 0.25, 0.5, 1, 2, 4, 8). Collect for every run the output of
+`evalClustering()` and the number of recovered cell types. Plot `ari`, `purity` and `ariMerged` against the number of clusters.
+
+```{r resolution sweep}
+## your code
+
+```
+
+**Task 2.6** Describe the result and compare it with your sketch.
+
+a) `ari` and `purity` move in opposite directions. Which kind of mismatch drives each of them?
+b) If you had to pick a resolution by the `ari` alone, which would you pick? Why is that a poor choice given section 2.2?
+c) `purity` levels off below 1. Use `matchTable()` at your highest resolution: which cell types are still mixed away?
+
+**Task (challenge).** Pick two cell types that are still mixed away at your highest resolution. Try to give them their own clusters
+by changing `k`, the number of HVGs, the number of PCs or the clustering function. Splitting other cell types is allowed.
+Document what you tried in a small table. It is a valid result if you do not succeed.
+
+```{r challenge}
+## your code
+
+```
+
+**Task (challenge).** A common remedy is subclustering. Take only the cells of major type `CD4 T`,
+run `preprocess()` again on this subset (why is that necessary?) and cluster it.
+Does `inOwnClusters` improve for `CD4 TCM`, `CD4 TEM` and `Treg`?
+
+```{r subclustering}
+## your code
+
+```
+
+
+```{r elapsed}
+paste(signif((proc.time() - startTime)["elapsed"], digits = 4), "s")
+sessionInfo()
+```
