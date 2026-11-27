@@ -39,7 +39,8 @@ set.seed(1234) # for reproducibility
 
 ```{r download, eval=FALSE}
 ## if you haven't downloaded it yet:
-download.file("http://imlspenticton.uzh.ch/teaching/STA426/week13.SCE.rds", dest="week13.SCE.rds")
+download.file("https://zenodo.org/records/24598016/files/Crowell_et_al_2020_subset.rds?download=1",
+              dest="Crowell_et_al_2020_subset.rds")
 # note that by default downloads in R timeout after 1min, so
 # when downloading large objects you might need to increase this limit:
 # options(timeout=1200) # timeout after 20min, instead of 1min...
@@ -47,7 +48,7 @@ download.file("http://imlspenticton.uzh.ch/teaching/STA426/week13.SCE.rds", dest
 
 
 ```{r sce object}
-sce <- readRDS("week13.SCE.rds")
+sce <- readRDS("Crowell_et_al_2020_subset.rds")
 
 # Have a look at the object
 sce
@@ -210,7 +211,7 @@ plotUMAP(sce, colour_by="group_id") +
 
 ```{r, fig.width=12, fig.height=10}
 # BiocNeighbors
-sce <- clusterGraph.se(sce, num.neighbors = 25)
+sce <- clusterGraph.se(sce, num.neighbors = 25, resolution = 1.5)
 # (we could play with the resolution argument to decide on the granularity)
 table(sce$clusters)
 
@@ -275,7 +276,7 @@ km
 ```{r checkMarkers, fig.width=10, fig.height=6}
 # muscat
 # mean logcounts by cluster:
-pb <- aggregateData(sce, "logcounts", by=c("cluster"), fun="mean")
+pb <- aggregateData(sce, "logcounts", by=c("clusters"), fun="mean")
 assayNames(pb) <- "logcounts"
 assays(pb)$propOfMax <- exp(logcounts(pb))/rowMaxs(exp(logcounts(pb)))
 
@@ -308,8 +309,8 @@ mat <- aggregate(t(scale(t(assay(pb)[unlist(km2),]))),
 cl2 <- mat[,1][apply(mat[,-1], 2, FUN=which.max)]
 
 # we convert the cells' cluster labels to cell type labels:
-sce$cluster2 <- cl2[sce$cluster]
-table(sce$cluster, sce$cluster2)
+sce$cluster2 <- cl2[as.integer(sce$clusters)]
+table(sce$clusters, sce$cluster2)
 plotUMAP(sce, colour_by="cluster2", text_by="cluster2", point_size=0.3, point_alpha=0.2)
 ```
 
@@ -321,7 +322,7 @@ assayNames(pb) <- "logcounts"
 # and we plot again the expression of the markers as a sanity check
 sechm(pb, km, assayName="logcounts", show_colnames=TRUE, do.scale=TRUE,
       breaks=1, row_title_rot=0, show_rownames = TRUE)
-saveRDS(sce, file="week13.SCE.processed.rds")
+saveRDS(sce, file="Crowell.SCE.processed.rds")
 ```
 
 # Differential state analysis
@@ -333,6 +334,7 @@ sce <- muscat::prepSCE(sce, kid="cluster2", sid = "sample_id",
 
 pb <- aggregateData(sce)
 pbMDS(pb)
+saveRDS(pb, file="Crowell.PB.rds")
 ```
 
 

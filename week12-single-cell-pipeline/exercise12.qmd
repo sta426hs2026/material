@@ -8,11 +8,12 @@ format:
 
 ### Getting started
 
-The aim of this exercise is to practice and push further what has been done during the hands-on session. We will be working with the same dataset, namely a single-cell RNA-seq of mouse cortex injected with LPS or with a vehicle treatment (see [Crowell et al.](https://www.nature.com/articles/s41467-020-19894-4)). You can download the data in [SingleCellExperiment (SCE)](https://bioconductor.org/packages/release/bioc/vignettes/SingleCellExperiment/inst/doc/intro.html) format [here](http://imlspenticton.uzh.ch/teaching/STA426/), or you can already work from the pseudobulk available here:
+The aim of this exercise is to practice and push further what has been done during the hands-on session. We will be working with the same dataset, namely a single-cell RNA-seq of mouse cortex injected with LPS or with a vehicle treatment (see [Crowell et al.](https://www.nature.com/articles/s41467-020-19894-4)). You can download the data in [SingleCellExperiment (SCE)](https://bioconductor.org/packages/release/bioc/vignettes/SingleCellExperiment/inst/doc/intro.html) format [here](https://zenodo.org/records/24598016), or you can already work from the pseudobulk available here:
 
 ```
 # the pseubo-bulk aggregation:
-download.file("http://imlspenticton.uzh.ch/teaching/STA426/week13.PB.rds", destination="week12.PB.rds")
+download.file("https://zenodo.org/records/24598016/files/Crowell.PB.rds?download=1",
+              destination="Crowell.PB.rds")
 ```
 
 The code used during the hands-on session is available in the [course github repo](https://github.com/sta426hs2026/material/tree/main/week12-single-cell-pipeline). An example of a different workflow on this very dataset, from pre-processing to clustering and differential state analysis, is available [here](http://htmlpreview.github.io/?https://github.com/HelenaLC/BC2_2019-workshop_multi-scRNA-seq/blob/master/LPS/docs/index.html).
